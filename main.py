@@ -8,13 +8,13 @@ pygame.init()
 
 # configurations
 frequency = 1 # in updates per second
-block_size = 40
+unit = 40
 block_width_number = 12
 block_height_number = 12
 block_number = block_height_number*block_width_number
 fps = 15
-window_height = block_height_number * block_size
-window_width = block_width_number * block_size
+window_height = block_height_number * unit
+window_width = block_width_number * unit
 
 # title and logo
 pygame.display.set_caption("Snake")
@@ -35,40 +35,52 @@ display = pygame.display.set_mode((window_width, window_height))
 clock = pygame.time.Clock()
 
 # position of the player
-pos = pygame.Vector2(0, display.get_height() - block_size)
+pos = pygame.Vector2(0, display.get_height() - unit)
 # pos_block = pygame.Vector2(round(pos.x / block_size), round(pos.y / block_size))
 pos_block = pygame.Vector2(0, block_height_number - 1)
+length = 3
+snake = []
 
+direction = 2 # 1 = up, 2 = right, 3 = down, 4 = left
+direction_for_tick = direction
 
 def draw_grid():
     for x in range(int(block_width_number)):
         for y in range(int(block_height_number)):
-            rect = pygame.Rect(x*block_size, y*block_size, block_size, block_size)
+            rect = pygame.Rect(x * unit, y * unit, unit, unit)
             pygame.draw.rect(display, DARK_GREEN if (x + y) % 2 == 0 else LIGHT_GREEN, rect)
-
             """
+            # for showing positions of each cell
             text = pygame.font.Font('comfortaa.ttf', 15)
             text_surface = text.render(f"{x}, {y}", True, RED)
             text_rect = text_surface.get_rect(center=((x * block_size) + block_size / 2, (y * block_size) + block_size / 2))
             display.blit(text_surface, text_rect)
             """
-
             if apples[x][y]:
-                gfxdraw.filled_circle(display, x*block_size + int(block_size / 2),
-                                 y*block_size + int(block_size / 2), int(3 * block_size / 8), RED)
-                gfxdraw.aacircle(display, x*block_size + int(block_size / 2),
-                                 y*block_size + int(block_size / 2), int(3 * block_size / 8), RED)
+                gfxdraw.filled_circle(display, x * unit + int(unit / 2),
+                                      y * unit + int(unit / 2), int(3 * unit / 8), RED)
+                gfxdraw.aacircle(display, x * unit + int(unit / 2),
+                                 y * unit + int(unit / 2), int(3 * unit / 8), RED)
     pygame.display.flip()
 
 
 def guess_ill_die():
+    # game over text
     text = pygame.font.Font('comfortaa.ttf', 40)
     text_surface = text.render('GAME OVER', True, RED)
     text_rect = text_surface.get_rect(center=(window_width / 2, window_height / 2))
     display.blit(text_surface, text_rect)
     pygame.display.flip()
+
+    # death sound
     pygame.mixer.Sound("./windows_shutdown.mp3" if random.randint(0, 1) == 1 else "./windows_error.mp3").play()
-    pygame.time.wait(2000)
+
+    # death animations
+    for position in snake:
+        body = pygame.Rect(position[0], position[1], unit, unit)
+        pygame.draw.rect(display, DARK_GREEN if ((position[0] + position[1]) / unit) % 2 == 0 else LIGHT_GREEN, body)
+        pygame.display.flip()
+        pygame.time.wait(300)
     pygame.quit()
     sys.exit()
 
@@ -77,21 +89,51 @@ def check_if_dead():
     if (pos_block.x > block_width_number - 1
             or pos_block.x < 0
             or pos_block.y > block_height_number - 1
-            or pos_block.y < 0):
+            or pos_block.y < 0
+            or (pos.x, pos.y) in snake):
         guess_ill_die()
 
 
 def check_for_apple():
-    print(pos_block.x, pos_block.y)
-    #print(apples[int(pos_block.x) - 1][int(pos_block.y) - 1])
     if apples[int(pos_block.x)][int(pos_block.y)]:
         grow()
         apples[int(pos_block.x)][int(pos_block.y)] = False
-        apples[random.randint(0, block_width_number - 1)][random.randint(0, block_height_number - 1)] = True
+
+        # choosing a new apple location
+        new_x = random.randint(0, block_width_number - 1)
+        new_y = random.randint(0, block_height_number - 1)
+        apples[new_x][new_y] = True
+        gfxdraw.filled_circle(display, new_x * unit + int(unit / 2),
+                              new_y * unit + int(unit / 2), int(3 * unit / 8), RED)
+        gfxdraw.aacircle(display, new_x * unit + int(unit / 2),
+                         new_y * unit + int(unit / 2), int(3 * unit / 8), RED)
 
 
 def grow():
-    print("Apple eaten! yummy")
+    global length
+    length += 1
+
+
+def move_body():
+    match direction:
+        case 1:
+            snake.insert(0, (pos.x, pos.y + unit))
+        case 2:
+            snake.insert(0, (pos.x - unit, pos.y))
+        case 3:
+            snake.insert(0, (pos.x, pos.y - unit))
+        case 4:
+            snake.insert(0, (pos.x + unit, pos.y))
+    if len(snake) >= length:
+        x = snake[len(snake) - 1][0]
+        y = snake[len(snake) - 1][1]
+        rect = pygame.Rect(x, y, unit, unit)
+        pygame.draw.rect(display, DARK_GREEN if ((x + y) / unit) % 2 == 0 else LIGHT_GREEN, rect)
+        pygame.display.flip()
+        snake.pop()
+    for position in snake:
+        body = pygame.Rect(position[0], position[1], unit, unit)
+        pygame.draw.rect(display, (18, 117, 22), body)
 
 
 fps_per_frequency = int(fps / frequency)
@@ -109,10 +151,7 @@ apples[0][block_height_number - 1] = False
 # there is always an apple in the center of the board
 apples[int(block_width_number / 2)][int(block_height_number / 2)] = True
 
-direction = 2 # 1 = up, 2 = right, 3 = down, 4 = left
-direction_for_tick = direction
-setup = True
-
+draw_grid()
 
 # forever loop
 while True:
@@ -121,49 +160,50 @@ while True:
 
     # draw stuff once per second
     if frame == fps_per_frequency:
-        draw_grid()
-
         # updating player's drawn position
-        pos.x += block_size if (direction == 2 and not setup) else 0
-        pos.x -= block_size if (direction == 4 and not setup) else 0
-        pos.y += block_size if (direction == 3 and not setup) else 0
-        pos.y -= block_size if (direction == 1 and not setup) else 0
+        match direction:
+            case 1:
+                pos.y -= unit
+            case 2:
+                pos.x += unit
+            case 3:
+                pos.y += unit
+            case 4:
+                pos.x -= unit
 
         # updating pos_block with pos
-        pos_block.x = int(pos.x / block_size)
-        pos_block.y = int(pos.y / block_size)
+        pos_block.x = int(pos.x / unit)
+        pos_block.y = int(pos.y / unit)
+
+        move_body()
 
         # draw player
         direction_for_tick = direction
-        player = pygame.Rect(pos.x, pos.y, block_size, block_size)
+        player = pygame.Rect(pos.x, pos.y, unit, unit)
         pygame.draw.rect(display, "red", player)
 
         # checking if player has to die or grow
         check_if_dead()
         check_for_apple()
 
-        print(frame)
-        print(pygame.time.get_ticks() - ticks)
         frame = 0
         ticks = pygame.time.get_ticks()
-    frame += 1
 
-    # I know, don't judge me
-    if setup:
-        setup = False
+    frame += 1
 
     # movement
     keys = pygame.key.get_pressed()
-    if keys[pygame.K_w] and direction_for_tick != 3:
+    if (keys[pygame.K_w] or keys[pygame.K_UP]) and direction_for_tick != 3:
         direction = 1
-    if keys[pygame.K_s] and direction_for_tick != 1:
+    elif (keys[pygame.K_s] or keys[pygame.K_DOWN]) and direction_for_tick != 1:
         direction = 3
-    if keys[pygame.K_a] and direction_for_tick != 2:
+    elif (keys[pygame.K_a] or keys[pygame.K_LEFT]) and direction_for_tick != 2:
         direction = 4
-    if keys[pygame.K_d] and direction_for_tick != 4:
+    elif (keys[pygame.K_d] or keys[pygame.K_RIGHT]) and direction_for_tick != 4:
         direction = 2
+
     if keys[pygame.K_LSHIFT]:
-        frequency = 3
+        frequency = 2
         frame = fps_per_frequency
     else:
         frequency = 1
